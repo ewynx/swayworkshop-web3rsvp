@@ -4,10 +4,13 @@ dep event_platform;
 use event_platform::*;
 
 use std::{
-   chain::auth::{AuthError, msg_sender},
+    auth::{
+        AuthError,
+        msg_sender,
+    },
+    call_frames::msg_asset_id,
     constants::BASE_ASSET_ID,
     context::{
-   call_frames::msg_asset_id,
         msg_amount,
         this_balance,
     },
@@ -61,12 +64,9 @@ impl eventPlatform for Contract {
     // check to see if the eventId is greater than storage.event_id_counter, if
     // it is, revert
         require(selected_event.unique_id < storage.event_id_counter, InvalidRSVPError::InvalidEventID);
-        // log(0);
     // check to see if the asset_id and amounts are correct, etc, if they aren't revert
         require(asset_id == BASE_ASSET_ID, InvalidRSVPError::IncorrectAssetId);
-        // log(1);
         require(amount >= selected_event.deposit, InvalidRSVPError::NotEnoughTokens);
-        // log(2);
     //send the payout
         transfer(amount, asset_id, selected_event.owner);
 
@@ -76,5 +76,11 @@ impl eventPlatform for Contract {
 
     // return the event
         return selected_event;
+    }
+
+    #[storage(read)]
+    fn get_rsvp(event_id: u64) -> Event {
+        let selected_event = storage.events.get(event_id);
+        selected_event
     }
 }

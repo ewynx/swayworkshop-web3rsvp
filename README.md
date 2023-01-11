@@ -1,146 +1,119 @@
 # Building on Fuel with Sway - Web3RSVP
 
-In this workshop, we'll build a fullstack dapp on Fuel.
+> The original workshop was given by [@camiinthisthang](https://twitter.com/camiinthisthang) and [this](https://github.com/camiinthisthang/learnsway-web3rsvp) is the original repo. This version you're looking at now is adapted to work with testnet beta-2 and contains some of the client upgrades that were added after the initial workshop. 
+
+In this workshop, we'll build a fullstack dapp on Fuel. The workshop consists of 3 parts:
+1. Create a contract in Sway
+2. Deploy the contract to beta-2 testnet
+3. Write a small client to connect to the contract on testnet
+
+## RSVP dApp
 
 This dapp is a bare-bones architectural reference for an event creation and management platform, similar to Eventbrite or Luma. Users can create a new event and RSVP to an existing event. This is the functionality we're going to build out in this workshop:
 
-- Create a function in the smart contract to create a new event
-- Create a function in the smart contract to RSVP to an existing event
+- Create a new event
+- RSVP to an existing event
+- Get the amount of RSVPs for event
 
 <img width="1723" alt="Screen Shot 2022-11-14 at 5 30 07 PM" src="https://user-images.githubusercontent.com/15346823/201781695-e3530429-46ad-40ea-96d2-00d6e8f27ed5.png">
 
-Let's break down the tasks associated with each function:
-
-_In order to create a function to create a new event, the program will have to be able to handle the following:_
-
-- the user should pass in the name of the event, a deposit amount for attendees to pay to be able to RSVP to the event, and the max capacity for the event.
-- Once a user passes this information in, our program should create an event, represented as a data structure called a `struct`.
-- Because this is an events platform, our program should be able to handle multiple events at once. Therefore, we need a mechanism to store multiple events.
-- To store multiple events, we will use a hash map, someimtes known as a hash table in other programming languages. This hash map will `map` a unique identifier, which we'll call an `eventId`, to an event (that is represented as a struct).
-
-_In order to create a function to handle a user RSVP'ing, or confirming their attendance to the event, our program will have to be able to handle the following_
-
-- We should have a mechsnism to identify the event that the user wants to rsvp to
-
-_Some resources that may be helpful:_
-
-- [Fuel Book](https://fuellabs.github.io/fuel-docs/master/)
-- [Sway Book](https://fuellabs.github.io/sway/v0.19.2/)
-- [Fuel discord](discord.gg/fuelnetwork) - get help
 
 ## Installation
 
 1. Install `cargo` using [`rustup`](https://www.rust-lang.org/tools/install)
 
-   Mac and Linux:
+    Mac and Linux:
 
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
+    ```bash
+    $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    ```
 
 2. Check for correct setup:
 
    ```bash
    $ cargo --version
-   cargo 1.62.0
+   cargo 1.64.0
    ```
 
-3. Install `forc` using [`fuelup`](https://fuellabs.github.io/sway/v0.18.1/introduction/installation.html#installing-from-pre-compiled-binaries)
+3. Install `forc` using [`fuelup`](https://fuellabs.github.io/fuelup/master/)
 
    Mac and Linux:
 
    ```bash
-   curl --proto '=https' --tlsv1.2 -sSf \
-   https://fuellabs.github.io/fuelup/fuelup-init.sh | sh
+    $ curl --proto '=https' --tlsv1.2 -sSf https://fuellabs.github.io/fuelup/fuelup-init.sh | sh
+   ```
+
+   Install toolchain `beta-2` in order to deploy to testnet beta-2:
+   ```
+   $ bashfuelup toolchain install beta-2
    ```
 
 4. Check for correct setup:
 
    ```bash
-   $ forc --version
-   forc 0.26.0
+    $ fuelup show
    ```
+   This should show `beta-2` as your active toolchain. 
 
 ### Editor
 
-You are welcome to use your editor of choice.
+You are welcome to use your editor of choice. VSCode has a plugin for Sway. 
 
 - [VSCode plugin](https://marketplace.visualstudio.com/items?itemName=FuelLabs.sway-vscode-plugin)
 - [Vim highlighting](https://github.com/FuelLabs/sway.vim)
 
-## Getting Started
+### Fuel & Sway Documentation
 
-This guide will walk developers through writing a smart contract in Sway, a simple test, deploying to Fuel, and building a frontend.
+For an intro to Sway and Fuel check out the [Developer Quickstart](https://fuellabs.github.io/fuel-docs/master/developer-quickstart.html) in the Fuel book and the info in the [Sway book](https://fuellabs.github.io/sway/v0.31.3/book/). 
 
-Before we begin, it may be helpful to understand terminology that will used throughout the docs and how they relate to each other:
+## 1. Create a contract in Sway
 
-- **Fuel**: the Fuel blockchain.
-- **FuelVM**: the virtual machine powering Fuel.
-- **Sway**: the domain-specific language crafted for the FuelVM; it is inspired by Rust.
-- **Forc**: the build system and package manager for Sway, similar to Cargo for Rust.
+Let's get started! First we'll create a new Fuel project and then write our contract.
 
-## Understand Sway Program Types
+Create a new, empty folder. In this repo it's called `swayworkshop_web3rsvp` but you can give it your own name.
 
-There are four types of Sway programs:
-
-- `contract`
-- `predicate`
-- `script`
-- `library`
-
-Contracts, predicates, and scripts can produce artifacts usable on the blockchain, while a library is simply a project designed for code reuse and is not directly deployable.
-
-The main features of a smart contract that differentiate it from scripts or predicates are that it is callable and stateful.
-
-A script is runnable bytecode on the chain which can call contracts to perform some task. It does not represent ownership of any resources and it cannot be called by a contract.
-
-## Create a new Fuel project
-
-**Start by creating a new, empty folder. We'll call it `Web3RSVP`.**
-
-### Writing the Contract
-
-Then with `forc` installed, create a project inside of your `Web3RSVP` folder:
+Go into the created folder and create a contract project, using `forc`: 
 
 ```sh
-$ cd Web3RSVP
-$ forc new eventPlatform
+$ cd swayworkshop_web3rsvp
+$ forc new rsvpContract
 To compile, use `forc build`, and to run tests use `forc test`
-
----
 ```
 
 Here is the project that `Forc` has initialized:
 
 ```console
-$ tree Web3RSVP
-eventPlatform
-├── Cargo.toml
+$ tree swayworkshop_web3rsvp
+rsvpContract
 ├── Forc.toml
-├── src
-│   └── main.sw
-└── tests
-    └── harness.rs
+└──  src
+     └── main.sw
 ```
 
-## Defining the ABI
+### Write the contract
 
-First, we'll define the ABI. An ABI defines an interface, and there is no function body in the ABI. A contract must either define or import an ABI declaration and implement it. It is considered best practice to define your ABI in a separate library and import it into your contract because this allows callers of the contract to import and use the ABI in scripts to call your contract.
+First, we'll define the ABI. An ABI defines an interface, and there is no function body in the ABI. Our ABI will contain the following functions:
+- `create_event` - create a new event with parameters
+- `rsvp` - rsvp for an existing event
+- `get_rsvp` - get amount of rsvps for event
+
+Also, we'll define the struct `Event` which contains all necessary information about an event. 
+
+
+> ABI stands for Application Binary Interface. ABI's inform the application the interface to interact with the VM, in other words, they provide info to the APP such as what methods a contract has, what params, types it expects, etc...
+
+A contract must either define or import an ABI declaration and implement it. It is considered best practice to define your ABI in a separate library and import it into your contract because this allows callers of the contract to import and use the ABI in scripts to call your contract.
 
 To define the ABI as a library, we'll create a new file in the `src` folder. Create a new file named `event_platform.sw`
 
 Here is what your project structure should look like now:
-Here is the project that `Forc` has initialized:
 
 ```console
-eventPlatform
-├── Cargo.toml
+rsvpContract
 ├── Forc.toml
-├── src
-│   └── main.sw
-│   └── event_platform.sw
-└── tests
-    └── harness.rs
+└──  src
+     └── main.sw
+     └── event_platform.sw
 ```
 
 Add the following code to your ABI file, `event_platform.sw`:
@@ -148,10 +121,7 @@ Add the following code to your ABI file, `event_platform.sw`:
 ```rust
 library event_platform;
 
-use std::{
-    identity::Identity,
-    contract_id::ContractId,
-};
+use std::{contract_id::ContractId, identity::Identity};
 
 abi eventPlatform {
     #[storage(read, write)]
@@ -159,9 +129,12 @@ abi eventPlatform {
 
     #[storage(read, write)]
     fn rsvp(event_id: u64) -> Event;
+
+    #[storage(read)]
+    fn get_rsvp(event_id: u64) -> Event;
 }
 
-// defining the struct here because it would be used by other developers who would be importing this ABI
+// The Event structure is defined here to be used from other contracts when calling the ABI. 
 pub struct Event {
     unique_id: u64,
     max_capacity: u64,
@@ -182,10 +155,13 @@ dep event_platform;
 use event_platform::*;
 
 use std::{
-   chain::auth::{AuthError, msg_sender},
+    auth::{
+        AuthError,
+        msg_sender,
+    },
+    call_frames::msg_asset_id,
     constants::BASE_ASSET_ID,
     context::{
-   call_frames::msg_asset_id,
         msg_amount,
         this_balance,
     },
@@ -200,6 +176,12 @@ use std::{
 storage {
     events: StorageMap<u64, Event> = StorageMap {},
     event_id_counter: u64 = 0,
+}
+
+pub enum InvalidRSVPError {
+    IncorrectAssetId: (),
+    NotEnoughTokens: (),
+    InvalidEventID: (),
 }
 
 impl eventPlatform for Contract {
@@ -228,18 +210,15 @@ impl eventPlatform for Contract {
         let amount = msg_amount();
 
      // get the event
-     //variables are immutable by default, so you need to use the mut keyword
         let mut selected_event = storage.events.get(event_id);
 
     // check to see if the eventId is greater than storage.event_id_counter, if
     // it is, revert
         require(selected_event.unique_id < storage.event_id_counter, InvalidRSVPError::InvalidEventID);
-
     // check to see if the asset_id and amounts are correct, etc, if they aren't revert
         require(asset_id == BASE_ASSET_ID, InvalidRSVPError::IncorrectAssetId);
         require(amount >= selected_event.deposit, InvalidRSVPError::NotEnoughTokens);
-
-          //send the payout from the msg_sender to the owner of the selected event
+    //send the payout
         transfer(amount, asset_id, selected_event.owner);
 
     // edit the event
@@ -249,138 +228,178 @@ impl eventPlatform for Contract {
     // return the event
         return selected_event;
     }
+
+    #[storage(read)]
+    fn get_rsvp(event_id: u64) -> Event {
+        let selected_event = storage.events.get(event_id);
+        selected_event
+    }
 }
 ```
 
-### Build the Contract
+### Build the contract
 
-From inside the `web3rsvp/eventPlatform` directory, run the following command to build your contract:
+From inside the `swayworkshop_web3rsvp/rsvpContract` directory, run the following command to build your contract:
 
 ```console
 $ forc build
   Compiled library "core".
   Compiled library "std".
-  Compiled contract "counter_contract".
-  Bytecode size is 224 bytes.
+  Compiled contract "rsvpContract".
+  Bytecode size is 6200 bytes.
 ```
 
-### Deploy the Contract
+## 2. Deploy the contract
 
-It's now time to deploy the contract to the testnet. We will show how to do this using `forc` from the command line, but you can also do it using the [Rust SDK](https://github.com/FuelLabs/fuels-rs#deploying-a-sway-contract) or the [TypeScript SDK](https://github.com/FuelLabs/fuels-ts/#deploying-contracts).
+Now we'll deploy the contract to testnet beta-2 using `forc`. The steps below follow the [Developer Quickstart](https://fuellabs.github.io/fuel-docs/master/developer-quickstart.html#deploy-the-contract). 
 
-In order to deploy a contract, you need to have a wallet to sign the transaction and coins to pay for gas. First, we'll create a wallet.
+In order to deploy a contract, you need to have a wallet with funds to sign the transaction and for gas. So first, we'll create a wallet.
 
-### Install the Wallet CLI
+### Create test wallet
 
 Follow [these steps to set up a wallet and create an account](https://github.com/FuelLabs/forc-wallet#forc-wallet).
 
-After typing in a password, be sure to save the mnemonic phrase that is output.
+After typing in a password, be sure to save the mnemonic phrase that is given.
 
 With this, you'll get a fuel address that looks something like this: `fuel1efz7lf36w9da9jekqzyuzqsfrqrlzwtt3j3clvemm6eru8fe9nvqj5kar8`. Save this address as you'll need it to sign transactions when we deploy the contract.
 
-#### Get Testnet Coins
+#### Fund test wallet
 
-With your account address in hand, head to the [testnet faucet](https://faucet-beta-1.fuel.network/) to get some coins sent to your wallet.
+With your account address in hand, head to the [testnet faucet](https://faucet-beta-1.fuel.network/) to get some coins sent to your wallet. (Note: the faucet is down sometimes, just keep trying!)
 
-## Deploy To Testnet
+### Deploy To Testnet
 
-Now that you have a wallet, you can deploy with `forc deploy` and passing in the testnet endpoint like this:
+> Note: make sure the test wallet is funded with test coins!
 
-`forc deploy --url https://node-beta-1.fuel.network/graphql --gas-price 1`
+This part might be a little tricky, but hang in there! You will need 2 separate console windows, 1 for deployment and 1 to sign the transaction for deployment. We'll go step by step. 
 
-> **Note**
-> We set the gas price to 1. Without this flag, the gas price is 0 by default and the transaction will fail.
+Deploy the contract as follows:
 
-The terminal will ask for the address of the wallet you want to sign this transaction with, paste in the address you saved earlier, it looks like this: `fuel1efz7lf36w9da9jekqzyuzqsfrqrlzwtt3j3clvemm6eru8fe9nvqj5kar8`
+```bash
+$ forc deploy --url node-beta-2.fuel.network/graphql --gas-price 1
+  Compiled library "core".
+  Compiled library "std".
+  Compiled contract "rsvpContract".
+  Bytecode size is 6200 bytes.
+Contract id: 0x0a98320d39c03337401a4e46263972a9af6ce69ec2f35a5420b1bd35784c74b1
+Please provide the address of the wallet you are going to sign this transaction with:
+```
+> Note: this is for testnet beta-2
 
-The terminal will output your contract id. Be sure to save this as you will need it to build a frontend with the Typescript SDK.
+The terminal does 2 things:
+- outputs contract id
+  -> save it since we will use it later.
+- asks for address of test wallet
+  
+In the terminal, paste the address of your test wallet (this is something like `fuel1efz7lf36w9da9jekqzyuzqsfrqrlzwtt3j3clvemm6eru8fe9nvqj5kar8` from the previous step).
 
-The terminal will output a `transaction id to sign` and prompt you for a signature. Open a new terminal tab and view your accounts by running `forc wallet list`. If you followed these steps, you'll notice you only have one account, `0`.
 
-Grab the `transaction id` from your other terminal and sign with a specified account by running the following command:
+Now, the terminal will output something like:
+```bash
+$ Transaction id to sign: 46f8b05087db6c071196d6f9124e5355d93caf6dca145ab0eec403f64ef4b74c
+$ Please provide the signature:
+```
+Here's how to proceed (this is the tricky part):
+1. Copy the transaction id 
+2. Open up a separate terminal tab or window
+3. Run the following command to create a signature:
+```bash
+$ forc wallet sign` + `[transaction id here, without brackets]` + `[the account number, without brackets]`
+```
+If you created a single account for the test wallet, the last number will be 0. the full command + output will look something like:
+```bash
+$ forc wallet sign 46f8b05087db6c071196d6f9124e5355d93caf6dca145ab0eec403f64ef4b74c 0
+Please enter your password to decrypt initialized wallet's phrases: 
+```
+4. Enter the password of your test wallet 
+5. The terminal will output a signature, like:
+```bash
+$ Signature: d0d286aef0839feed35fe1964824ef83aeb445d323bfb3997c7ec9041c0fc205f614c7330c54c96ba1987ebc6c43c3e686f00973de86554ed224632eb557df00
+```
+  Copy the signature (in above example this would be: `d0d286aef0839feed35fe1964824ef83aeb445d323bfb3997c7ec9041c0fc205f614c7330c54c96ba1987ebc6c43c3e686f00973de86554ed224632eb557df00`)
 
-```console
-forc wallet sign` + `[transaction id here, without brackets]` + `[the account number, without brackets]`
+6. Go back to the first terminal tab and paste the signature, now wait for deployment. Full reference terminal output:
+```bash
+$ Transaction id to sign: 46f8b05087db6c071196d6f9124e5355d93caf6dca145ab0eec403f64ef4b74c
+$ Please provide the signature:440019447b824de08609ca8ee8921cc91c2364534bc118c23cc74a2247ea694e9aacd6aa58cf257c4020bdaa2376e89f290f611c33a1fd0cbcb8b5764e97af35
+$ Waiting 1s before retrying    
+$ contract 0a98320d39c03337401a4e46263972a9af6ce69ec2f35a5420b1bd35784c74b1 deployed in block 0x977d032e67faaf33a9a71efad7d27fb736e9e611071c288706c7c1898e44d6c7
 ```
 
-Your command should look like this:
+**Congratulations!** You've deployed your contract to beta-2 testnet.
 
-```console
-$ forc wallet sign 16d7a8f9d15cfba1bd000d3f99cd4077dfa1fce2a6de83887afc3f739d6c84df 0
-Please enter your password to decrypt initialized wallet's phrases:
-Signature: 736dec3e92711da9f52bed7ad4e51e3ec1c9390f4b05caf10743229295ffd5c1c08a4ca477afa85909173af3feeda7c607af5109ef6eb72b6b40b3484db2332c
-```
+On the the [Block explorer](https://fuellabs.github.io/block-explorer-v2/) you can verify the transaction for deployment. Grab the transaction id and prefix it with `0x`. 
 
-Enter your password when prompted, and you'll get back a `signature`. Save that signature, and return to your other terminal window, and paste that in where its prompting you to `provide a signature for this transaction`.
+> Note: searching for the contract id or block hash will not (yet) work
 
-Finally, you will get back a `TransactionId` to confirm your contract was deployed. With this ID, you can head to the [block explorer](https://fuellabs.github.io/block-explorer-v2/) and view your contract.
+## 3. Create a Frontend to Interact with Contract
 
-> **Note**
-> You should prefix your `TransactionId` with `0x` to view it in the block explorer
+The final step is to create a simple client to interact with our contract on testnet. It's important to use the correct version match of the `fuels` dependencies; for testnet beta-2 the versions below will work. 
 
-## Create a Frontend to Interact with Contract
+These are the steps we will take:
 
-Now we are going to
+1. **Initialize a React project**
+2. **Install the `fuels` SDK dependencies**
+3. **Generate contract typings for Typescript** 
+4. **Create a test wallet (again..)**
+5. **Add the frontend code**
+6. **Run the client 🎉**
 
-1. **Initialize a React project.**
-2. **Install the `fuels` SDK dependencies.**
-3. **Modify the App.**
-4. **Run our project.**
+To get started, you'll need to have Nodejs ([nodejs installation](https://nodejs.org/en/)) and npm installed. See [reactjs docs](https://reactjs.org/docs/create-a-new-react-app.html#create-react-app) for more info. 
 
-## Initialize a React project
+### 1. Initialize a React project
 
-To split better our project let's create a new folder `frontend` and initialize our project inside it.
-
-In the terminal, go back up one directory and initialize a react project using [`Create React App`](https://create-react-app.dev/).
+In the root folder, we'll create a separate folder for the client, called `frontend`. Here, we initialize a new react project with [`Create React App`](https://create-react-app.dev/). This can be done with the following command:
 
 ```console
 $ cd ..
 $ npx create-react-app frontend --template typescript
-Success! Created frontend at Fuel/Web3RSVP/frontend
+Success! Created frontend at /swayworkshop-web3rsvp/frontend
+```
+This gives the following structure:
+```bash
+$ swayworkshop-web3rsvp
+  ├── rsvpContract
+  └── frontend
 ```
 
-You should now have your outer folder, `Web3RSVP`, with two folders inside: `frontend` and `rsvpContract`
+### 2. Install the `fuels` SDK dependencies
 
-![project folder structure](./images/quickstart-folder-structure.png)
-
-### Install the `fuels` SDK dependencies
-
-On this step we need to install 3 dependencies for the project:
+In this step we need to install the following 3 dependencies for the project (commands follow below):
 
 1. `fuels`: The umbrella package that includes all the main tools; `Wallet`, `Contracts`, `Providers` and more.
 2. `fuelchain`: Fuelchain is the ABI TypeScript generator.
-3. `typechain-target-fuels`: The Fuelchain Target is the specific interpreter for the [Fuel ABI Spec](https://github.com/FuelLabs/fuel-specs/blob/master/specs/protocol/abi.md).
+3. `typechain-target-fuels`: The Fuelchain Target is the specific interpreter for the [Fuel ABI Spec](https://fuellabs.github.io/fuel-specs/master/protocol/abi/index.html).
 
-> ABI stands for Application Binary Interface. ABI's inform the application the interface to interact with the VM, in other words, they provide info to the APP such as what methods a contract has, what params, types it expects, etc...
-
-### Install
 
 Move into the `frontend` folder, then install the dependencies:
 
 ```console
 $ cd frontend
-$ npm install fuels --save
+$ npm install fuels@0.24.2 --save
 added 65 packages, and audited 1493 packages in 4s
-$ npm install fuelchain typechain-target-fuels --save-dev
+$ npm install fuelchain@0.24.2 typechain-target-fuels@0.24.2 --save-dev
 added 33 packages, and audited 1526 packages in 2s
 ```
 
-### Generating contract types
+### 3. Generate contract typings for Typescript
 
 To make it easier to interact with our contract we use `fuelchain` to interpret the output ABI JSON from our contract. This JSON was created on the moment we executed the `forc build` to compile our Sway Contract into binary.
 
-If you see the folder `Web3RSVP/rsvpContract/out` you will be able to see the ABI JSON there. If you want to learn more, read the [ABI Specs here](https://github.com/FuelLabs/fuel-specs/blob/master/specs/protocol/abi.md).
+If you see the folder `swayworkshop-web3rsvp/rsvpContract/out` you will be able to see the ABI JSON there. If you want to learn more, read the [ABI Specs here](https://github.com/FuelLabs/fuel-specs/blob/master/specs/protocol/abi.md).
 
-Inside `Web3RSVP/frontend` run;
+Inside `swayworkshop-web3rsvp/frontend` run;
 
 ```console
 $ npx fuelchain --target=fuels --out-dir=./src/contracts ../rsvpContract/out/debug/*-abi.json
 Successfully generated 4 typings!
 ```
 
-Now you should be able to find a new folder `Web3RSVP/frontend/src/contracts`. This folder was auto-generated by our `fuelchain` command, this files abstract the work we would need to do to create a contract instance, and generate a complete TypeScript interface to the Contract, making easy to develop.
+Now you should be able to find a new folder `swayworkshop-web3rsvp/frontend/src/contracts`. This folder was auto-generated by our `fuelchain` command, and makes it easy for us to communicate with the contract by creating a Typescript interface for the contract.
 
-### Create A Wallet (Again)
+> Note: when you make changes to the contract and deploy a new version of the contract to testnet, you'll have to regenerate the Typings as well.
+
+### 4. Create a wallet (again..)
 
 For interacting with the fuel network we have to submit signed transactions with enough funds to cover network fees. The Fuel TS SDK don't currently support Wallet integrations, requiring us to have a non-safe wallet inside the WebApp using a privateKey.
 
@@ -414,32 +433,39 @@ private key 0x719fb4da652f2bd4ad25ce04f4c2e491926605b40e5475a80551be68d57e0fcb
 
 Save the generated address and private key. You will need the private key later to set it as a string value for a variable `WALLET_SECRET` in your `App.tsx` file. More on that below.
 
-First, take the address of your wallet and use it to get some coins from [the testnet faucet](https://faucet-beta-1.fuel.network/).
+#### Fund this test wallet as well 
+
+Once again, take the address of your wallet and use it to get some coins from [the testnet faucet](https://faucet-beta-1.fuel.network/). Make sure your wallet is funded before moving on to the next step. 
 
 Now you're ready to build and ship ⛽
 
-### Modify the App
+### 5. Add the frontend code
 
-Inside the `frontend` folder let's add code that interacts with our contract.
+Inside the `frontend` folder let's add code that interacts with our contract. Replace the following values in the code:
+- `CONTRACT_ID` - The contract id you got when deploying the contract to testnet
+- `WALLET_SECRET` - The private key you got from running createWallet.js
+
+
 Read the comments to help you understand the App parts.
 
-Change the file `Web3RSVP/frontend/src/App.tsx` to:
+Change the file `swayworkshop-web3rsvp/frontend/src/App.tsx` to:
 
 ```js
 import React, { useEffect, useState } from "react";
-import { Wallet } from "fuels";
+import { Wallet, Provider, WalletLocked, bn } from "fuels";
 import "./App.css";
-// Import the contract factory -- you can find the name in index.ts.
-// You can also do command + space and the compiler will suggest the correct name.
+// The contract info we created with 
+// $ npx fuelchain --target=fuels --out-dir=./src/contracts ../rsvpContract/out/debug/*-abi.json
 import { RsvpContractAbi__factory } from "./contracts";
 // The address of the contract deployed the Fuel testnet
-// const CONTRACT_ID = "0x32f10d6f296fbd07e16f24867a11aab9d979ad95f54b223efc0d5532360ef5e4";
-const CONTRACT_ID = "<YOUR-CONTRACT-ADDRESS-HERE>";
-//the private key from createWallet.js
-const WALLET_SECRET = "<YOU-PRIVATE-KEY-HERE>"
-// Create a Wallet from given secretKey in this case
-// The one we configured at the chainConfig.json
-const wallet = new Wallet(WALLET_SECRET, "https://node-beta-1.fuel.network/graphql");
+const CONTRACT_ID = "0x0a98320d39c03337401a4e46263972a9af6ce69ec2f35a5420b1bd35784c74b1";
+// The private key from createWallet.js
+const WALLET_SECRET = "0x4a4f77caa6be0f262928d7ea3e65e719f39047ffd5b51b4940c1a93ee594f50e";
+// Create a Wallet from secretkey
+const wallet = Wallet.fromPrivateKey(
+  WALLET_SECRET,
+  "https://node-beta-2.fuel.network/graphql"
+);
 // Connects out Contract instance to the deployed contract
 // address using the given wallet.
 const contract = RsvpContractAbi__factory.connect(CONTRACT_ID, wallet);
@@ -450,7 +476,6 @@ export default function App(){
   //state variables to capture the selection of an existing event to RSVP to
   const [eventName, setEventName] = useState('');
   const [maxCap, setMaxCap] = useState(0);
-  const [deposit, setDeposit] = useState(0);
   const [eventCreation, setEventCreation] = useState(false);
   const [rsvpConfirmed, setRSVPConfirmed] = useState(false);
   const [numOfRSVPs, setNumOfRSVPs] = useState(0);
@@ -473,43 +498,43 @@ export default function App(){
     });
   }, []);
 
-  useEffect(() => {
-    console.log("eventName", eventName);
-    console.log("deposit", deposit);
-    console.log("max cap", maxCap);
-  },[eventName, maxCap, deposit]);
-
   async function rsvpToEvent(){
     setLoading(true);
     try {
-      console.log('amount deposit', deposit);
-      const { value, transactionResponse, transactionResult } = await contract.functions.rsvp(eventId).callParams({
-        forward: [deposit]
+      console.log('RSVPing to event');
+      // Retrieve the current RSVP data
+      const { value: eventData } = await contract!.functions.get_rsvp(eventId).get();
+      const requiredAmountToRSVP = eventData.deposit.toString();
+      
+      console.log("deposit required to rsvp", requiredAmountToRSVP.toString());
+      setEventId(eventData.unique_id.toString());
+      setMaxCap(eventData.max_capacity.toNumber());
+      setEventName(eventData.name.toString());
+      console.log("event name", eventData.name);
+      console.log("event capacity", eventData.max_capacity.toString());
+      console.log("eventID", eventData.unique_id.toString())
+      
+      // Create a transaction to RSVP to the event
+      const { value: eventRSVP, transactionId } = await contract!.functions.rsvp(eventId).callParams({
+        forward: [requiredAmountToRSVP]
         //variable outputs is when a transaction creates a new dynamic UTXO
         //for each transaction you do, you'll need another variable output
         //for now, you have to set it manually, but the TS team is working on an issue to set this automatically
       }).txParams({gasPrice: 1, variableOutputs: 1}).call();
-      console.log(transactionResult);
-      console.log(transactionResponse);
-      console.log("RSVP'd to the following event", value);
-      console.log("deposit value", value.deposit.toString());
-      console.log("# of RSVPs", value.num_of_rsvps.toString());
-      setNumOfRSVPs(value.num_of_rsvps.toNumber());
-      setEventName(value.name.toString());
-      setEventId(value.unique_id.toString());
-      setMaxCap(value.max_capacity.toNumber());
-      setDeposit(value.deposit.toNumber());
-      //value.deposit.format()
-      console.log("event name", value.name);
-      console.log("event capacity", value.max_capacity.toString());
-      console.log("eventID", value.unique_id.toString())
+
+      console.log(
+        'Transaction created', transactionId,
+        `https://fuellabs.github.io/block-explorer-v2/transaction/${transactionId}`
+      );
+      console.log("# of RSVPs", eventRSVP.num_of_rsvps.toString());
+      setNumOfRSVPs(eventRSVP.num_of_rsvps.toNumber());
       setRSVPConfirmed(true);
-      alert("rsvp successful")
+      alert("rsvp successful");
     } catch (err: any) {
       console.error(err);
       alert(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -517,8 +542,10 @@ export default function App(){
     e.preventDefault();
     setLoading(true);
     try {
-      console.log("creating event")
-      const { value } = await contract.functions.create_event(newEventMax, newEventDeposit, newEventName).txParams({gasPrice: 1}).call();
+      console.log("creating event");
+      const requiredDeposit = bn.parseUnits(newEventDeposit.toString());
+      console.log('requiredDeposit', requiredDeposit.toString());
+      const { value } = await contract!.functions.create_event(newEventMax, requiredDeposit, newEventName).txParams({gasPrice: 1}).call();
 
       console.log("return of create event", value);
       console.log("deposit value", value.deposit.toString());
@@ -526,7 +553,6 @@ export default function App(){
       console.log("event capacity", value.max_capacity.toString());
       console.log("eventID", value.unique_id.toString())
       setNewEventID(value.unique_id.toString())
-      //setEventId(value.uniqueId.toString())
       setEventCreation(true);
       alert('Event created');
     } catch (err: any) {
@@ -552,7 +578,7 @@ return (
           </button>
         </form>
       </div>
-      <div className="form">
+      <div className="form rsvp">
         <h2>RSVP to an Event</h2>
         <label className="label">Event Id</label>
         <input className="input" name="eventId" onChange={e => setEventId(e.target.value)} placeholder="pass in the eventID"/>
@@ -574,7 +600,7 @@ return (
           {rsvpConfirmed && <>
           <div className="card">
             <h1>RSVP Confirmed to the following event: {eventName}</h1>
-            <p>Num of RSVPs: {numOfRSVPs}</p>
+            <h2>Num of RSVPs: {numOfRSVPs}</h2>
           </div>
           </>}
       </div>
@@ -582,13 +608,14 @@ return (
 
 );
 }
+
 ```
 
-### Run your project
+### 6. Run the client 🎉
 
-Now it's time to have fun run the project on your browser;
+Now it's time to have fun and run the project on your browser;
 
-Inside `Web3RSVP/frontend` run;
+Inside `swayworkshop-web3rsvp/frontend` run;
 
 ```console
 $ npm start
@@ -605,18 +632,12 @@ To create a production build, use npm run build.
 
 #### ✨⛽✨ Congrats you have completed your first DApp on Fuel ✨⛽✨
 
-![Screen Shot 2022-10-06 at 10 08 26 AM](https://user-images.githubusercontent.com/15346823/194375753-4c5de0cd-eaf3-4ba7-8e25-efe8e082fa93.png)
-
-Tweet me [@camiinthisthang](https://twitter.com/camiinthisthang) and let me know you just built a dapp on Fuel, you might get invited to a private group of builders, be invited to the next Fuel dinner, get alpha on the project, or something 👀.
-
-> Note: To push this project up to a github repo, you'll have to remove the `.git` file that automatically gets created with `create-react-app`. You can do that by running the following command in `Web3RSVP/frontend`: `Rm -rf .git`. Then, you'll be good to add, commit, and push these files.
-
-### Updating The Contract
+## Updating the contract
 
 If you make changes to your contract, here are the steps you should take to get your frontend and contract back in sync:
 
 - In your contract directory, run `forc build`
-- In your contract directory, redeploy the contract by running this command and following the same steps as above to sign the transaction with your wallet: `forc deploy --url https://node-beta-1.fuel.network/graphql --gas-price 1`
+- In your contract directory, redeploy the contract by running this command and following the same steps as above to sign the transaction with your wallet: `forc deploy --url node-beta-2.fuel.network/graphql --gas-price 1`
 - In your frontend directory, re-run this command: `npx fuelchain --target=fuels --out-dir=./src/contracts ../rsvpContract/out/debug/*-abi.json`
 - In your frontend directory, update the contract ID in your `App.tsx` file
 
